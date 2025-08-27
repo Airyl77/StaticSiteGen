@@ -34,9 +34,3 @@ def split_nodes_delimiter(old_nodes: List[TextNode], delimiter, text_type: TextT
                 split_nodes.append(TextNode(splitted_list[i], text_type))
         new_nodes.extend(split_nodes)
     return new_nodes
-
-node = TextNode("This is text with a `code block` word, and a second `code block 2` inside", TextType.TEXT)
-node2 = TextNode("This is text with a `code block 3` word, and a second `code block 4` inside", TextType.TEXT)
-node3 = TextNode("This is text with a `code block` word, and a second `code block 2` inside", TextType.BOLD)
-new_nodes = split_nodes_delimiter([node, node2, node3], "`", TextType.CODE)
-print(new_nodes)
