@@ -1,6 +1,8 @@
 import unittest
 from markdown_split import (
     split_nodes_delimiter,
+    extract_markdown_images,
+    extract_markdown_links,
 )
 
 from textnode import TextNode, TextType
@@ -85,6 +87,30 @@ class TestInlineMarkdown(unittest.TestCase):
             ],
             new_nodes,
         )
+
+    def test_extract_markdown_images_basic(self):
+        text = "here ![alt](http://img) and ![x](y)"
+        imgs = extract_markdown_images(text)
+        self.assertEqual(imgs, [("alt", "http://img"), ("x", "y")])
+
+    def test_extract_markdown_images_empty_alt(self):
+        text = "![](u)"
+        imgs = extract_markdown_images(text)
+        self.assertEqual(imgs, [("", "u")])
+
+    def test_extract_markdown_links_basic(self):
+        text = "a [link](http://a) and [b](c)"
+        links = extract_markdown_links(text)
+        self.assertEqual(links, [("link", "http://a"), ("b", "c")])
+
+    def test_extract_markdown_links_ignores_images(self):
+        text = "a ![alt](u) and [link](v)"
+        links = extract_markdown_links(text)
+        self.assertEqual(links, [("link", "v")])
+
+    def test_extract_markdown_links_no_match_returns_empty(self):
+        text = "no links here"
+        self.assertEqual(extract_markdown_links(text), [])
 
 
 if __name__ == "__main__":
