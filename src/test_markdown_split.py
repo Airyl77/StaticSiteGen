@@ -3,6 +3,8 @@ from markdown_split import (
     split_nodes_delimiter,
     extract_markdown_images,
     extract_markdown_links,
+    split_nodes_image,
+    split_nodes_link,
 )
 
 from textnode import TextNode, TextType
@@ -111,6 +113,65 @@ class TestInlineMarkdown(unittest.TestCase):
     def test_extract_markdown_links_no_match_returns_empty(self):
         text = "no links here"
         self.assertEqual(extract_markdown_links(text), [])
+
+    def test_split_nodes_image_basic(self):
+        nodes = [TextNode("here ![alt](http://img) end", TextType.TEXT)]
+        out = split_nodes_image(nodes)
+        self.assertEqual(
+            out,
+            [
+                TextNode("here ", TextType.TEXT),
+                TextNode("alt", TextType.IMAGE, "http://img"),
+                TextNode(" end", TextType.TEXT),
+            ],
+        )
+
+    def test_split_nodes_link_basic(self):
+        nodes = [TextNode("go [link](http://a)", TextType.TEXT)]
+        out = split_nodes_link(nodes)
+        self.assertEqual(
+            out,
+            [
+                TextNode("go ", TextType.TEXT),
+                TextNode("link", TextType.LINK, "http://a"),
+            ],
+        )
+
+    def test_split_nodes_image_and_link_combined(self):
+        # This sample contains both an image and a link; run image splitter then link splitter
+        nodes = [TextNode("start ![i](im) middle [l](u) end", TextType.TEXT)]
+        out = split_nodes_image(nodes)
+        out = split_nodes_link(out)
+        self.assertEqual(
+            out,
+            [
+                TextNode("start ", TextType.TEXT),
+                TextNode("i", TextType.IMAGE, "im"),
+                TextNode(" middle ", TextType.TEXT),
+                TextNode("l", TextType.LINK, "u"),
+                TextNode(" end", TextType.TEXT),
+            ],
+        )
+
+    def test_adjacent_images_and_links(self):
+        # adjacent items without intervening text
+        nodes = [TextNode("![a](u)![b](v)[c](w)", TextType.TEXT)]
+        out = split_nodes_image(nodes)
+        out = split_nodes_link(out)
+        self.assertEqual(
+            out,
+            [
+                TextNode("a", TextType.IMAGE, "u"),
+                TextNode("b", TextType.IMAGE, "v"),
+                TextNode("c", TextType.LINK, "w"),
+            ],
+        )
+
+    def test_no_markdown_returns_same(self):
+        # strings without markdown should be returned unchanged by splitters
+        nodes = [TextNode("plain text without markdown", TextType.TEXT)]
+        self.assertEqual(split_nodes_image(nodes), nodes)
+        self.assertEqual(split_nodes_link(nodes), nodes)
 
 
 if __name__ == "__main__":
