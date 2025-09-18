@@ -5,6 +5,7 @@ from markdown_split import (
     extract_markdown_links,
     split_nodes_image,
     split_nodes_link,
+    text_to_textnodes,
 )
 
 from textnode import TextNode, TextType
@@ -172,6 +173,57 @@ class TestInlineMarkdown(unittest.TestCase):
         nodes = [TextNode("plain text without markdown", TextType.TEXT)]
         self.assertEqual(split_nodes_image(nodes), nodes)
         self.assertEqual(split_nodes_link(nodes), nodes)
+
+    def test_text_to_textnodes_plain(self):
+        nodes = text_to_textnodes("plain text")
+        self.assertEqual(nodes, [TextNode("plain text", TextType.TEXT)])
+
+    def test_text_to_textnodes_combined_formatting(self):
+        s = "Here `code` and **bold** and _ital_"
+        nodes = text_to_textnodes(s)
+        self.assertEqual(
+            nodes,
+            [
+                TextNode("Here ", TextType.TEXT),
+                TextNode("code", TextType.CODE),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("bold", TextType.BOLD),
+                TextNode(" and ", TextType.TEXT),
+                TextNode("ital", TextType.ITALIC),
+            ],
+        )
+
+    def test_text_to_textnodes_images_and_links(self):
+        s = "prefix ![a](i) mid [b](u) suffix"
+        nodes = text_to_textnodes(s)
+        self.assertEqual(
+            nodes,
+            [
+                TextNode("prefix ", TextType.TEXT),
+                TextNode("a", TextType.IMAGE, "i"),
+                TextNode(" mid ", TextType.TEXT),
+                TextNode("b", TextType.LINK, "u"),
+                TextNode(" suffix", TextType.TEXT),
+            ],
+        )
+
+    def test_nested_markdown(self):
+        # Test nested formatting: bold containing italic
+        s = "before **bold _ital_ end** after"
+        nodes = text_to_textnodes(s)
+        # The current implementation splits in this order: code, bold, italic
+        # So italic splitting happens after bold splitting; expected behavior
+        # Current parser only splits delimiters on TEXT nodes, so the italic
+        # markup remains inside the BOLD node. We assert the current behavior
+        # so the test documents it.
+        self.assertEqual(
+            nodes,
+            [
+                TextNode("before ", TextType.TEXT),
+                TextNode("bold _ital_ end", TextType.BOLD),
+                TextNode(" after", TextType.TEXT),
+            ],
+        )
 
 
 if __name__ == "__main__":

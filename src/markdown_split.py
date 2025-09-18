@@ -2,6 +2,7 @@ import re
 from typing import List
 from textnode import TextNode, TextType
 
+
 def split_nodes_delimiter(old_nodes: List[TextNode], delimiter, text_type: TextType):
     """
     Splits each TextNode in old_nodes by the given delimiter and assigns the specified text_type to the delimited segments.
@@ -77,6 +78,7 @@ def _split_nodes_by_matches(old_nodes, match_fn, make_literal, node_type):
 
     return new_nodes
 
+
 def split_nodes_image(old_nodes):
     return _split_nodes_by_matches(
         old_nodes,
@@ -85,6 +87,7 @@ def split_nodes_image(old_nodes):
         node_type=TextType.IMAGE,
     )
 
+
 def split_nodes_link(old_nodes):
     return _split_nodes_by_matches(
         old_nodes,
@@ -92,3 +95,17 @@ def split_nodes_link(old_nodes):
         make_literal=lambda label, url: f"[{label}]({url})",
         node_type=TextType.LINK,
     )
+
+def text_to_textnodes(text):
+    initial_node = TextNode(text, TextType.TEXT)
+    # Split code segments
+    code_nodes = split_nodes_delimiter([initial_node], "`", TextType.CODE)
+    # Split bold segments
+    bold_nodes = split_nodes_delimiter(code_nodes, "**", TextType.BOLD)
+    # Split italic segments
+    italic_nodes = split_nodes_delimiter(bold_nodes, "_", TextType.ITALIC)
+    # Split image segments
+    image_nodes = split_nodes_image(italic_nodes)
+    # Split link segments
+    nodes = split_nodes_link(image_nodes)
+    return nodes
