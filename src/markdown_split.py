@@ -1,6 +1,16 @@
 import re
 from typing import List
-from textnode import TextNode, TextType
+from enum import Enum
+from textnode import TextNode, TextType, text_node_to_html_node
+from htmlnode import ParentNode, LeafNode
+
+class BlockType(Enum):
+    PARAGRAPH = "paragraph"
+    HEADING = "heading"
+    CODE = "code"
+    QUOTE = "quote"
+    UNORDERED_LIST = "unordered_list"
+    ORDERED_LIST = "ordered_list"
 
 
 def split_nodes_delimiter(old_nodes: List[TextNode], delimiter, text_type: TextType):
@@ -96,7 +106,8 @@ def split_nodes_link(old_nodes):
         node_type=TextType.LINK,
     )
 
-def text_to_textnodes(text):
+
+def text_to_textnodes(text) -> List[TextNode]:
     initial_node = TextNode(text, TextType.TEXT)
     # Split code segments
     code_nodes = split_nodes_delimiter([initial_node], "`", TextType.CODE)
@@ -109,3 +120,157 @@ def text_to_textnodes(text):
     # Split link segments
     nodes = split_nodes_link(image_nodes)
     return nodes
+
+
+def markdown_to_blocks(markdown):
+    """
+    Splits a markdown string into a list of non-empty blocks.
+
+    A block is defined as a section of text separated by two or more newlines.
+    Leading and trailing whitespace is removed from each block, and empty blocks are omitted.
+
+    Args:
+        markdown (str): The markdown content to split.
+
+    Returns:
+        list[str]: A list of non-empty, stripped markdown blocks.
+    """
+    all_blocks = markdown.split('\n\n')
+    clean_blocks = [stripped for block in all_blocks if (stripped := block.strip())]
+    return clean_blocks
+
+
+def block_to_block_type(block):
+    """
+    Determines the type of a Markdown block.
+    Analyzes the given block of text and returns its corresponding BlockType,
+    such as HEADING, CODE, QUOTE, UNORDERED_LIST, ORDERED_LIST, or PARAGRAPH,
+    based on Markdown syntax rules.
+    Args:
+        block (str): The block of text to classify.
+    Returns:
+        BlockType: The type of the block, as defined by the BlockType enum.
+    """
+    heading = r'^#{1,6}\s.*$'
+    code_block = r'^```.*```$'
+
+    # Check for heading (single line)
+    if re.match(heading, block):
+        return BlockType.HEADING
+    
+    # Check for code block (single line fenced)
+    if re.match(code_block, block, re.DOTALL):
+        return BlockType.CODE
+    
+    # For multi-line blocks, check each line
+    lines = block.split('\n')
+    if not lines:
+        return BlockType.PARAGRAPH
+    
+    # Check for quote (all non-empty lines must start with >)
+    if all(line.startswith('>') for line in lines if line.strip()):
+        return BlockType.QUOTE
+    
+    # Check for unordered list (all non-empty lines must start with -)
+    if all(line.startswith('-') for line in lines if line.strip()):
+        return BlockType.UNORDERED_LIST
+    # Check for ordered list (all non-empty lines must start with a number followed by .)
+    
+    list_numbering = 1
+    ordered_list = True
+    for line in lines:
+        if not line.startswith(str(list_numbering)+". "):
+            ordered_list = False
+            break
+        list_numbering += 1
+    
+    return BlockType.ORDERED_LIST if ordered_list else BlockType.PARAGRAPH
+
+
+def markdown_to_html_node(markdown):
+    """
+    Converts a markdown string into a hierarchical HTML node structure.
+
+    Args:
+        markdown (str): The markdown text to be converted.
+
+    Returns:
+        ParentNode: The root HTML node containing child nodes representing the parsed markdown blocks.
+
+    The function splits the input markdown into blocks, determines the type of each block,
+    and appends the corresponding HTML node (code, paragraph, heading, quote, unordered list, or ordered list)
+    as a child to the root "div" node.
+    """
+    parent_node = ParentNode("div", [])
+    blocks = markdown_to_blocks(markdown)
+    for block in blocks:
+        block_type = block_to_block_type(block)
+        if block_type == BlockType.CODE:
+            parent_node.children.append(block_to_code_node(block))
+        if block_type == BlockType.PARAGRAPH:
+            parent_node.children.append(block_to_paragraph_node(block))
+        if block_type == BlockType.HEADING:
+            parent_node.children.append(block_to_heading_node(block))
+        if block_type == BlockType.QUOTE:
+            parent_node.children.append(block_to_quote_node(block))
+        if block_type == BlockType.UNORDERED_LIST:
+            parent_node.children.append(block_to_unordered_list_node(block))
+        if block_type == BlockType.ORDERED_LIST:
+            parent_node.children.append(block_to_ordered_list_node(block))      
+
+    return parent_node
+
+
+def text_to_children(text: str) -> List[LeafNode]:
+    out_nodes = []
+    list_of_nodes = text_to_textnodes(text)
+    for node in list_of_nodes:
+        out_nodes.append(text_node_to_html_node(node))
+    return out_nodes
+
+
+def block_to_paragraph_node(text):
+    out_text = " ".join(text.split("\n"))
+    parent = ParentNode("p", text_to_children(out_text))
+    return parent
+
+
+def block_to_heading_node(text):
+    splitted_text = text.split(" ")
+    heading_value = len(splitted_text[0])
+    node = LeafNode(f"h{heading_value}", " ".join(splitted_text[1:]))
+    return node
+
+
+def block_to_code_node(text):
+    leaf = LeafNode("code", text)
+    parent = ParentNode("pre", [leaf])
+    return parent
+
+
+def block_to_quote_node(text):
+    lines = text.split('\n')
+    cleaned_lines = [line.lstrip('> ').rstrip() for line in lines]
+    combined_text = ' '.join(cleaned_lines)
+    parent = ParentNode("blockquote", text_to_children(combined_text))
+    return parent
+
+
+def block_to_unordered_list_node(text):
+    lines = text.split('\n')
+    cleaned_lines = [line.lstrip('- ').rstrip() for line in lines]
+    parent = ParentNode("ul", [])
+    for line in cleaned_lines:
+        li_parent = ParentNode("li", text_to_children(line))
+        parent.children.append(li_parent)    
+    return parent
+
+
+def block_to_ordered_list_node(text):
+    lines = text.split('\n')
+    cleaned_lines = [re.split(r'\d+\.\s', line, maxsplit=1)[1] for line in lines if line.strip()]
+    parent = ParentNode("ol", [])
+    for line in cleaned_lines:
+        li_parent = ParentNode("li", text_to_children(line))
+        parent.children.append(li_parent)    
+    return parent
