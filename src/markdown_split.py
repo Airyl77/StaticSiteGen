@@ -204,6 +204,7 @@ def markdown_to_html_node(markdown):
     parent_node = ParentNode("div", [])
     blocks = markdown_to_blocks(markdown)
     for block in blocks:
+        # print(block)
         block_type = block_to_block_type(block)
         if block_type == BlockType.CODE:
             parent_node.children.append(block_to_code_node(block))
@@ -274,3 +275,10 @@ def block_to_ordered_list_node(text):
         li_parent = ParentNode("li", text_to_children(line))
         parent.children.append(li_parent)    
     return parent
+
+
+def extract_title(markdown):
+    blocks = markdown_to_blocks(markdown)
+    if blocks[0].startswith("# "):
+        return blocks[0].lstrip("# ").strip()
+    raise Exception("Header not found")

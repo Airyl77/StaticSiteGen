@@ -9,6 +9,7 @@ from markdown_split import (
     markdown_to_blocks,
     block_to_block_type,
     markdown_to_html_node,
+    extract_title,
     BlockType
 )
 
@@ -492,6 +493,16 @@ This is the same paragraph on a new line
         md = "# Heading\n\nParagraph\n\n```code block```\n\n> Quote"
         node = markdown_to_html_node(md)
         self.assertEqual([c.tag for c in node.children], ["h1", "p", "pre", "blockquote"])
+
+    def test_extract_title_found(self):
+        md = "# Heading\n\nParagraph\n\n```code block```\n\n> Quote"
+        header = extract_title(md)
+        self.assertEqual(header, "Heading")
+    
+    def test_extract_title_not_found(self):
+        md = "## Heading\n\nParagraph\n\n```code block```\n\n> Quote"
+        with self.assertRaises(Exception):
+            extract_title(md)
 
 
 if __name__ == "__main__":

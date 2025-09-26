@@ -2,6 +2,7 @@ import os
 import shutil
 import logging
 from datetime import datetime
+import markdown_split as ms
 
 PROJECT_ROOT = "/".join(os.path.dirname(__file__).split("/")[0:-1])
 STATIC_PATH = os.path.join(PROJECT_ROOT, "static")
@@ -36,6 +37,7 @@ def main():
     logger.info(f"Ensured public directory exists: {PUBLIC_PATH}")
 
     copy_all_files_recursive(STATIC_PATH, PUBLIC_PATH)
+    generate_page("content/index.md", "template.html", "public/index.html")
 
 
 def copy_all_files_recursive(source_dir, dest_dir):
@@ -61,6 +63,24 @@ def copy_all_files_recursive(source_dir, dest_dir):
             except Exception as e:
                 logger.error(f"Failed to process directory {source_path}: {str(e)}")
 
+
+def read_file_contents(filename):
+    with open(filename, "r") as f:
+        return f.read()
+
+
+def generate_page(from_path, template_path, dest_path):
+    logger.info(f"Generating page from {from_path} to {dest_path} using {template_path}")
+    markdown = read_file_contents(from_path)
+    template = read_file_contents(template_path)
+    html_string = ms.markdown_to_html_node(markdown).to_html()
+    title = ms.extract_title(markdown)
+    template = template.replace("{{ Title }}", title).replace("{{ Content }}", html_string)
+    pathdir = os.path.dirname(dest_path)
+    print(pathdir)
+    os.makedirs(pathdir, exist_ok=True)
+    with open(dest_path, "w") as f:
+        f.write(template)
 
 if __name__ == "__main__":
     logger.info("=== Starting File Copy Operation ===")
